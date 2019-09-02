@@ -109,7 +109,7 @@ function checkRunStatus(runInstanceId, cb, lastStatus){
 
 function runProgress(runInstanceId, progressMsg){
     var dateTime = toDateTimeString(new Date().toString());
-    console.log(toFixedLength(dateTime, 21).grey + toFixedLength(runInstanceId, 12) + '.............. '.grey + progressMsg);
+    console.log(dateTime.grey + ' ' + toFixedLength(runInstanceId, 12) + '.............. '.grey + progressMsg);
 }
 
 function runFailed(reason, err){
@@ -119,6 +119,7 @@ function runFailed(reason, err){
 }
 
 function allRunsEnded(runInfos){
+    var allTestsPassed = true;
 
     runInfos.forEach(runInfo => {
         var table = new Table();
@@ -126,6 +127,7 @@ function allRunsEnded(runInfos){
         table.push([ 'Suite'.bold, 'Test'.bold, 'Started'.bold, 'Ended'.bold, 'Duration'.bold, 'Status'.bold ]);
 
         orderRunTests(runInfo.tests).forEach(test => {
+            if(!test.passed) allTestsPassed = false;
             table.push([ test.suitePath, test.name, test.start, test.end, test.duration, test.state ]);
         });
         
@@ -136,8 +138,14 @@ function allRunsEnded(runInfos){
         console.log('\n');
     });
 
-    // console.log('ALL DONE'.green);
+    if(!allTestsPassed) console.log('Some test failed, exiting with status 1'.red);
+    else console.log('All test passed, exiting with status 0'.green);
+    process.exit(allTestsPassed ? 0 : 1);
 }
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+    process.on(signal, () => process.exit());
+});
 
 /*
  * HELPERS
@@ -148,16 +156,35 @@ function toFixedLength(str, len, replaceChar){
     else return str;
 }
 
-function toDateString(date){
-    return date ? new Date(date).toLocaleDateString('de-DE') : '';
+function getUTCDateObject(date){
+    date = new Date(date);
+
+    return {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1, // 1-12
+        day: date.getUTCDate(), // 1-31
+        hour: date.getUTCHours(), // 0-23
+        minute: date.getUTCMinutes(), // 0-59
+        second: date.getUTCSeconds(), // 0-59
+        msecond: date.getUTCMilliseconds() // 0-999
+    };
 }
 
-function toDateTimeString(date){
-    return date ? new Date(date).toLocaleString('de-DE') : '';
+function toDateString(date){
+    if(!date) return '';
+    var d = getUTCDateObject(date);
+    return toFixedChars(d.day, 2) + '.' + toFixedChars(d.month, 2) + '.' + d.year;
 }
 
 function toTimeString(date){
-    return date ? new Date(date).toLocaleTimeString('de-DE') : '';
+    if(!date) return '';
+    var d = getUTCDateObject(date);
+    return toFixedChars(d.hour, 2) + ':' + toFixedChars(d.minute, 2) + ':' + toFixedChars(d.second, 2);
+}
+
+function toDateTimeString(date){
+    if(!date) return '';
+    return toDateString(date) + ' ' + toTimeString(date);
 }
 
 function getLastTestPathString(testsObj){
@@ -208,6 +235,7 @@ function orderRunTests(testsObj){
         test.suitePath = suitePath.join(' / ');
         test.sortKey = sortKey.join('-');
         test.state = getRunTestState(test);
+        test.passed = testHasPassed(test);
         test.duration = getRunDuration(test.startTS, test.endTS);
         test.start = toTimeString(test.startTS);
         test.end = test.finished ? toTimeString(test.endTS) : '';
@@ -223,6 +251,10 @@ function orderRunTests(testsObj){
     return tests;
 }
 
+function testHasPassed(test){
+    return test.finished && !test.error && !test.failed;
+}
+
 function getRunTestState(test){
     if(test.finished && !test.error && !test.failed) return 'passed'.green;
     else if(test.failed || test.error) return 'failed'.red;
@@ -236,11 +268,11 @@ function getRunDuration(start, end){
     if(!start || !end) return '';
     start = new Date(start);
     end = new Date(end);
-    var duration = new Date(end.getTime() - start.getTime());
+    var d = getUTCDateObject(end.getTime() - start.getTime());
 
-    return  toFixedChars( (duration.getHours()-1)*60 + duration.getMinutes(), 2) +
+    return  toFixedChars( d.hour*60 + d.minute, 2) +
             ':' +
-            toFixedChars( duration.getSeconds(), 2 ) + 
+            toFixedChars( d.second, 2 ) +
             '.' +
-            toFixedChars( Math.round(duration.getMilliseconds() / 10), 2 );
+            toFixedChars( Math.round(d.msecond / 10), 2 );
 }

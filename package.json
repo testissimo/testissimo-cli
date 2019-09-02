@@ -1,7 +1,7 @@
 {
     "name": "testissimo-cli",
     "preferGlobal": false,
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "TESTISSIMO - Matus Szabo <info@testissimo.io>",
     "description": "testissimo cli",
     "dependencies": {
