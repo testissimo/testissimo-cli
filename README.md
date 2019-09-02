@@ -1,2 +1,2 @@
 # testissimo-cli
-Testissimo command line tool
+Testissimo command line interface
